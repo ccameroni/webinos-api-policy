@@ -332,7 +332,10 @@ var editPolicy = function (pe, ps, userId, serviceId, access, request, res) {
 
 $(document).ready(function(){
     $("#b1").bind('click', function () {
-        var user = webinos.session.getPZPId();
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
         var service = "service1";
         getPolicy_ServiceForPeople(user, service, function(access) {
             $('#status').html('STATUS: ');
@@ -365,7 +368,10 @@ $(document).ready(function(){
     });
 
     $("#b5").bind('click', function () {
-        var user = webinos.session.getPZPId();
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
         getPolicy_ServicesForPeople(user, function(services) {
             console.log("services: " + JSON.stringify(services));
             $('#status').html('STATUS: ');
@@ -443,7 +449,10 @@ $(document).ready(function(){
     });
 
     $("#b13").bind('click', function () {
-        var user = webinos.session.getPZPId();
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
         var service = "service2";
         var access = "enable"
         setPolicy_ServiceForPeople(user, service, access, function(users) {
@@ -452,7 +461,10 @@ $(document).ready(function(){
         });
     });
     $("#b14").bind('click', function () {
-        var user = webinos.session.getPZPId();
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
         var service = "service1";
         var access = "enable"
         setPolicy_ServiceForPeople(user, service, access, function() {
