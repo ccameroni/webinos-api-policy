@@ -155,22 +155,26 @@ var getPolicy_PeopleForServices  = function(serviceId, successCB) {
 };
 
 function getMatch(policy, string) {
-    var obj = {}, ret = [], val;
+    var obj = {}, ret = [];
 
     var exp = new RegExp('"' + string + '"\s*,\s*"match"\s*:\s*"([^"]*)', 'g');
-    while (val = exp.exec(policy)) {
-        obj[val[1]] = 0;
-    }
+    extractItems(policy, exp, obj);
     var exp = new RegExp('match"\s*:\s*"([^"]*)"\s*,\s*"attr"\s*:\s*"' + string + '"', 'g');
-    while (val = exp.exec(policy)) {
-        obj[val[1]] = 0;
-    }
+    extractItems(policy, exp, obj);
+
     if (string == 'user-id') {
-        if (webinos.session.isConnected()) {
-            obj[webinos.session.getPZHId()] = 0;
+        // add zone owner
+        var zoneOwner = webinos.session.getPZHId()
+        if (zoneOwner) {
+            obj[zoneOwner] = 0;
         }
-        else{ //virgin mode only
+        else { // PZP not enrolled
             obj[webinos.session.getPZPId()] = 0;
+        }
+        // add friends
+        var friends = webinos.session.getConnectedPzh();
+        for (var i in friends) {
+            obj[friends[i]] = 0;
         }
     }
 
@@ -179,6 +183,26 @@ function getMatch(policy, string) {
     }
     return ret;
 }
+
+var extractItems = function(policy, exp, obj) {
+    var genericURIs = [
+        'http://webinos.org/subject/id/PZ-Owner',
+        'http://webinos.org/subject/id/known'
+    ];
+
+    while (val = exp.exec(policy)) {
+        // split required to manage bags
+        var items = val[1].split(',');
+        for (var i in items) {
+            item = items[i].trim();
+            // skip generic URIs
+            if (genericURIs.indexOf(item) == -1) {
+                obj[item] = 0;
+            }
+        }
+    }
+}
+
 
 var setPolicy_ServiceForPeople  = function(userId, serviceId, access, successCB, errorCB) {
     webinos.discovery.findServices(new ServiceType('http://webinos.org/core/policymanagement'), {
@@ -373,7 +397,6 @@ $(document).ready(function(){
             user = webinos.session.getPZPId();
         }
         getPolicy_ServicesForPeople(user, function(services) {
-            console.log("services: " + JSON.stringify(services));
             $('#status').html('STATUS: ');
             for (var i = 0; i < services.length; i++) {
                 $('#status').append(services[i].access + " access to " + services[i].serviceId + " service by " + user + "<br />");
@@ -383,7 +406,6 @@ $(document).ready(function(){
     $("#b6").bind('click', function () {
         var user = "friend1";
         getPolicy_ServicesForPeople(user, function(services) {
-            console.log("services: " + JSON.stringify(services));
             $('#status').html('STATUS: ');
             for (var i = 0; i < services.length; i++) {
                 $('#status').append(services[i].access + " access to " + services[i].serviceId + " service by " + user + "<br />");
@@ -393,7 +415,6 @@ $(document).ready(function(){
     $("#b7").bind('click', function () {
         var user = "friend2";
         getPolicy_ServicesForPeople(user, function(services) {
-            console.log("services: " + JSON.stringify(services));
             $('#status').html('STATUS: ');
             for (var i = 0; i < services.length; i++) {
                 $('#status').append(services[i].access + " access to " + services[i].serviceId + " service by " + user + "<br />");
@@ -403,7 +424,6 @@ $(document).ready(function(){
     $("#b8").bind('click', function () {
         var user = "friend3";
         getPolicy_ServicesForPeople(user, function(services) {
-            console.log("services: " + JSON.stringify(services));
             $('#status').html('STATUS: ');
             for (var i = 0; i < services.length; i++) {
                 $('#status').append(services[i].access + " access to " + services[i].serviceId + " service by " + user + "<br />");
