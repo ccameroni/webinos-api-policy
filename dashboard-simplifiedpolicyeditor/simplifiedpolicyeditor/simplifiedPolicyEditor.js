@@ -18,18 +18,35 @@
  *
  ******************************************************************************/
 
-var getPolicy_ServiceForPeople  = function(userId, serviceId, successCB) {
+//var getPolicy_ServiceForPeople  = function(userId, serviceId, successCB) {
+var getPolicy_ServiceForPeople = function() {
+    var requestorId = null;
+    var userId = arguments[0];
+    var serviceId = arguments[1];
+    if (arguments.length == 3) {
+	var successCB = arguments[2];
+    } else if ( arguments.length == 4 ) {
+	var requestorId = arguments[2];
+	var successCB = arguments[3];
+    }
     webinos.discovery.findServices(new ServiceType('http://webinos.org/core/policymanagement'), {
         onFound: function(service) {
             policyeditor = service;
             policyeditor.bindService({
                 onBind: function(service) {
+// 0 is the policySetId , 0 means the manufacture's code. function(ps) is the callback, null below is the errorCB.
                     policyeditor.getPolicySet(0, function(ps) {
                         var request = {};
                         request.subjectInfo = {};
                         request.subjectInfo.userId = userId;
                         request.resourceInfo = {};
                         request.resourceInfo.serviceId = serviceId;
+			if(requestorId != null) {
+			    request.deviceInfo = {};
+			    request.deviceInfo.requestorId = requestorId;
+			}
+
+// hell, what is to do with this function?
                         var policy = ps.toJSONObject()
                         policyeditor.testPolicy(ps, request, function(res) {
                             if (res.effect == 0) {
@@ -49,7 +66,19 @@ var getPolicy_ServiceForPeople  = function(userId, serviceId, successCB) {
     });
 };
 
-var getPolicy_ServicesForPeople = function(userId, successCB) {
+
+//var getPolicy_ServicesForPeople = function(userId, successCB) {
+var getPolicy_ServicesForPeople = function() {
+    var requestorId = null;
+    var userId = arguments[0];
+
+    if (arguments.length == 2) {
+	var successCB = arguments[1];
+    } else if (arguments.length == 3) {
+	var requestorId = arguments[1];
+	var successCB = arguments[2];
+    }
+
 
     var result = [];
     var done = function(callback) {
@@ -59,7 +88,9 @@ var getPolicy_ServicesForPeople = function(userId, successCB) {
                             callback();
             };
     };
+
     var sync = done(function() { successCB(result); });
+
     var test = function (ps, request, i) {
         sync(+1);
         policyeditor.testPolicy(ps, request, function(res) {
@@ -86,17 +117,25 @@ var getPolicy_ServicesForPeople = function(userId, successCB) {
                         var policy = ps.toJSONObject()
                         var policyString = JSON.stringify(policy);
                         var services = getMatch(policyString, 'service-id');
-                        for (var i = 0; i < services.length; i++) {
-                            var request = {};
-                            request.subjectInfo = {};
-                            request.subjectInfo.userId = userId;
-                            request.resourceInfo = {};
-                            request.resourceInfo.serviceId = services[i];
-                            var service = {};
-                            service.serviceId = services[i];
-                            result.push(service);
-                            test(ps, request, i);
-                        }
+			for (var i = 0; i < services.length; i++) {
+			    var request = {};
+			    request.subjectInfo = {};
+			    request.subjectInfo.userId = userId;
+			    request.resourceInfo = {};
+			    request.resourceInfo.serviceId = services[i];
+
+			    if (requestorId != null) {
+				request.deviceInfo = {};
+				request.deviceInfo.requestorId = requestorId;
+			    }
+
+
+			    var service = {};
+			    service.serviceId = services[i];
+			    result.push(service);
+			    test(ps, request, i);
+
+			}
                     }, null);
                 }
             });
@@ -104,7 +143,16 @@ var getPolicy_ServicesForPeople = function(userId, successCB) {
     });
 };
 
-var getPolicy_PeopleForServices  = function(serviceId, successCB) {
+//var getPolicy_PeopleForServices  = function(serviceId, successCB) {
+var getPolicy_PeopleForServices = function() {
+    var requestorId = null;
+    var serviceId = arguments[0];
+    if (arguments.length == 2) {
+	var successCB = arguments[1];
+    } else if (arguments.length == 3) {
+	var requestorId = arguments[1];
+	var successCB = arguments[2];
+    }
 
     var result = [];
     var done = function(callback) {
@@ -134,19 +182,27 @@ var getPolicy_PeopleForServices  = function(serviceId, successCB) {
                         var policy = ps.toJSONObject()
                         var policyString = JSON.stringify(policy);
                         var users = getMatch(policyString, 'user-id');
+
                         for (var i = -1; i < users.length; i++) {
-                            var request = {};
-                            request.resourceInfo = {};
-                            request.resourceInfo.serviceId = serviceId;
-                            if (i > -1) {
+			    var request = {};
+			    request.resourceInfo = {};
+			    request.resourceInfo.serviceId = serviceId;
+
+			    if(requestorId != null) {
+				request.deviceInfo = {};
+				request.deviceInfo.requestorId = requestorId;
+			    }
+
+			    if (i > -1) {
                                 request.subjectInfo = {};
                                 request.subjectInfo.userId = users[i];
                                 test(ps, request, users[i]);
-                            }
-                            else {
+			    }
+			    else {
                                 test(ps, request, 'anyUser');
-                            }
-                        }
+			    }
+
+			}
                     }, null);
                 }
             });
@@ -723,5 +779,131 @@ $(document).ready(function(){
             $('#status').append("error " + msg + "<br />");
         });
     });
+
+    $("#b21").bind('click', function () {
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
+        var service = "service1";
+        var device = "Phone";
+        getPolicy_ServiceForPeople(user, service, device, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user);
+        });
+    });
+    $("#b22").bind('click', function () {
+        var user = "friend1";
+        var service = "service1";
+        var device = "Tablet";
+        getPolicy_ServiceForPeople(user, service, device, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user);
+        });
+    });
+    $("#b23").bind('click', function () {
+        var user = "friend2";
+        var service = "service1";
+        var device = "TV";
+        getPolicy_ServiceForPeople(user, service, device, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user);
+        });
+    });
+    $("#b24").bind('click', function () {
+        var user = "friend3";
+        var service = "service1";
+        var device = "Scooter";
+        getPolicy_ServiceForPeople(user, service, device, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user);
+        });
+    });
+
+    $("#b25").bind('click', function () {
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
+        var device = "Car";
+        getPolicy_ServicesForPeople(user, device, function(services) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < services.length; i++) {
+                $('#status').append(services[i].access + " access to " + services[i].serviceId + " service from " + device + " by " + user + "<br />");
+            }
+        });
+    });
+    $("#b26").bind('click', function () {
+        var user = "friend1";
+        var device = "TV";
+        getPolicy_ServicesForPeople(user, device, function(services) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < services.length; i++) {
+                $('#status').append(services[i].access + " access to " + services[i].serviceId + " service from " + device + " by " + user + "<br />");
+            }
+        });
+    });
+    $("#b27").bind('click', function () {
+        var user = "friend2";
+        var device = "Laptop";
+        getPolicy_ServicesForPeople(user, device, function(services) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < services.length; i++) {
+                $('#status').append(services[i].access + " access to " + services[i].serviceId + " service from " + device + " by " + user + "<br />");
+            }
+        });
+    });
+    $("#b28").bind('click', function () {
+        var user = "friend3";
+        var device = "Phone";
+        getPolicy_ServicesForPeople(user, device, function(services) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < services.length; i++) {
+                $('#status').append(services[i].access + " access to " + services[i].serviceId + " service from " + device + " by " + user + "<br />");
+            }
+        });
+    });
+
+    $("#b29").bind('click', function () {
+        var service = "service1";
+        var device = "Phone";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b30").bind('click', function () {
+        var service = "service2";
+        var device = "Car";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b31").bind('click', function () {
+        var service = "service3";
+        var device = "Laptop";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b32").bind('click', function () {
+        var service = "service4";
+        var device = "TV";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+
 });
 
