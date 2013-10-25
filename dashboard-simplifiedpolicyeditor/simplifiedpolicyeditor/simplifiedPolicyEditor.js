@@ -18,35 +18,39 @@
  *
  ******************************************************************************/
 
-//var getPolicy_ServiceForPeople  = function(userId, serviceId, successCB) {
+var friendsURI = 'http://webinos.org/subject/id/known';
+
 var getPolicy_ServiceForPeople = function() {
     var requestorId = null;
     var userId = arguments[0];
     var serviceId = arguments[1];
     if (arguments.length == 3) {
-	var successCB = arguments[2];
+        var successCB = arguments[2];
     } else if ( arguments.length == 4 ) {
-	var requestorId = arguments[2];
-	var successCB = arguments[3];
+        var requestorId = arguments[2];
+        var successCB = arguments[3];
     }
     webinos.discovery.findServices(new ServiceType('http://webinos.org/core/policymanagement'), {
         onFound: function(service) {
             policyeditor = service;
             policyeditor.bindService({
                 onBind: function(service) {
-// 0 is the policySetId , 0 means the manufacture's code. function(ps) is the callback, null below is the errorCB.
                     policyeditor.getPolicySet(0, function(ps) {
                         var request = {};
                         request.subjectInfo = {};
                         request.subjectInfo.userId = userId;
                         request.resourceInfo = {};
-                        request.resourceInfo.serviceId = serviceId;
-			if(requestorId != null) {
-			    request.deviceInfo = {};
-			    request.deviceInfo.requestorId = requestorId;
-			}
+                        if (isWebinosAPI(serviceId)) {
+                            request.resourceInfo.apiFeature = serviceId;
+                        }
+                        else {
+                            request.resourceInfo.serviceId = serviceId;
+                        }
+                        if(requestorId != null) {
+                            request.deviceInfo = {};
+                            request.deviceInfo.requestorId = requestorId;
+                        }
 
-// hell, what is to do with this function?
                         var policy = ps.toJSONObject()
                         policyeditor.testPolicy(ps, request, function(res) {
                             if (res.effect == 0) {
@@ -67,26 +71,25 @@ var getPolicy_ServiceForPeople = function() {
 };
 
 
-//var getPolicy_ServicesForPeople = function(userId, successCB) {
 var getPolicy_ServicesForPeople = function() {
     var requestorId = null;
     var userId = arguments[0];
 
     if (arguments.length == 2) {
-	var successCB = arguments[1];
+        var successCB = arguments[1];
     } else if (arguments.length == 3) {
-	var requestorId = arguments[1];
-	var successCB = arguments[2];
+        var requestorId = arguments[1];
+        var successCB = arguments[2];
     }
 
 
     var result = [];
     var done = function(callback) {
-            var counter = 0;
-            return function (incr) {
-                    if (0 == (counter += incr))
-                            callback();
-            };
+        var counter = 0;
+        return function (incr) {
+            if (0 == (counter += incr))
+                callback();
+        };
     };
 
     var sync = done(function() { successCB(result); });
@@ -116,26 +119,44 @@ var getPolicy_ServicesForPeople = function() {
                     policyeditor.getPolicySet(0, function(ps) {
                         var policy = ps.toJSONObject()
                         var policyString = JSON.stringify(policy);
+
                         var services = getMatch(policyString, 'service-id');
-			for (var i = 0; i < services.length; i++) {
-			    var request = {};
-			    request.subjectInfo = {};
-			    request.subjectInfo.userId = userId;
-			    request.resourceInfo = {};
-			    request.resourceInfo.serviceId = services[i];
+                        for (var i = 0; i < services.length; i++) {
+                            var request = {};
+                            request.subjectInfo = {};
+                            request.subjectInfo.userId = userId;
+                            request.resourceInfo = {};
+                            request.resourceInfo.serviceId = services[i];
 
-			    if (requestorId != null) {
-				request.deviceInfo = {};
-				request.deviceInfo.requestorId = requestorId;
-			    }
+                            if (requestorId != null) {
+                                request.deviceInfo = {};
+                                request.deviceInfo.requestorId = requestorId;
+                            }
 
+                            var service = {};
+                            service.serviceId = services[i];
+                            result.push(service);
+                            test(ps, request, i);
+                        }
 
-			    var service = {};
-			    service.serviceId = services[i];
-			    result.push(service);
-			    test(ps, request, i);
+                        var apis = getMatch(policyString, 'api-feature');
+                        for (var i = 0; i < apis.length; i++) {
+                            var request = {};
+                            request.subjectInfo = {};
+                            request.subjectInfo.userId = userId;
+                            request.resourceInfo = {};
+                            request.resourceInfo.apiFeature = apis[i];
 
-			}
+                            if (requestorId != null) {
+                                request.deviceInfo = {};
+                                request.deviceInfo.requestorId = requestorId;
+                            }
+
+                            var service = {};
+                            service.serviceId = apis[i];
+                            result.push(service);
+                            test(ps, request, i + services.length);
+                        }
                     }, null);
                 }
             });
@@ -143,24 +164,23 @@ var getPolicy_ServicesForPeople = function() {
     });
 };
 
-//var getPolicy_PeopleForServices  = function(serviceId, successCB) {
 var getPolicy_PeopleForServices = function() {
     var requestorId = null;
     var serviceId = arguments[0];
     if (arguments.length == 2) {
-	var successCB = arguments[1];
+        var successCB = arguments[1];
     } else if (arguments.length == 3) {
-	var requestorId = arguments[1];
-	var successCB = arguments[2];
+        var requestorId = arguments[1];
+        var successCB = arguments[2];
     }
 
     var result = [];
     var done = function(callback) {
-            var counter = 0;
-            return function (incr) {
-                    if (0 == (counter += incr))
-                            callback();
-            };
+        var counter = 0;
+        return function (incr) {
+            if (0 == (counter += incr))
+                callback();
+        };
     };
     var sync = done(function() { successCB(result); });
     var test = function (ps, request, user) {
@@ -184,25 +204,30 @@ var getPolicy_PeopleForServices = function() {
                         var users = getMatch(policyString, 'user-id');
 
                         for (var i = -1; i < users.length; i++) {
-			    var request = {};
-			    request.resourceInfo = {};
-			    request.resourceInfo.serviceId = serviceId;
+                            var request = {};
+                            request.resourceInfo = {};
+                            if (isWebinosAPI(serviceId)) {
+                                request.resourceInfo.apiFeature = serviceId;
+                            }
+                            else {
+                                request.resourceInfo.serviceId = serviceId;
+                            }
 
-			    if(requestorId != null) {
-				request.deviceInfo = {};
-				request.deviceInfo.requestorId = requestorId;
-			    }
+                            if(requestorId != null) {
+                                request.deviceInfo = {};
+                                request.deviceInfo.requestorId = requestorId;
+                            }
 
-			    if (i > -1) {
+                            if (i > -1) {
                                 request.subjectInfo = {};
                                 request.subjectInfo.userId = users[i];
                                 test(ps, request, users[i]);
-			    }
-			    else {
+                            }
+                            else {
                                 test(ps, request, 'anyUser');
-			    }
+                            }
 
-			}
+                        }
                     }, null);
                 }
             });
@@ -259,8 +284,6 @@ var extractItems = function(policy, exp, obj) {
     }
 }
 
-var friendsURI = 'http://webinos.org/subject/id/known';
-
 // input formats
 // with device: setPolicy_ServiceForPeople(userId, serviceId, requestorId, access, successCB, errorCB);
 // without device: setPolicy_ServiceForPeople(userId, serviceId, access, successCB, errorCB);
@@ -289,7 +312,12 @@ var setPolicy_ServiceForPeople = function() {
                         request.subjectInfo = {};
                         request.subjectInfo.userId = userId;
                         request.resourceInfo = {};
-                        request.resourceInfo.serviceId = serviceId;
+                        if (isWebinosAPI(serviceId)) {
+                            request.resourceInfo.apiFeature = serviceId;
+                        }
+                        else {
+                            request.resourceInfo.serviceId = serviceId;
+                        }
                         if (requestorId != null) {
                             request.deviceInfo = {};
                             request.deviceInfo.requestorId = requestorId;
@@ -329,7 +357,13 @@ var setPolicy_ServiceForPeople = function() {
 
 var editPolicy = function (pe, ps, access, request, res) {
     var userId = request.subjectInfo.userId;
-    var serviceId = request.resourceInfo.serviceId;
+    var serviceId = null;
+    if (request.resourceInfo.serviceId) {
+        serviceId = request.resourceInfo.serviceId;
+    }
+    else if (request.resourceInfo.apiFeature) {
+        serviceId = request.resourceInfo.apiFeature;
+    }
     var requestorId = null;
     var date = new Date().getTime();
     if (request.deviceInfo) {
@@ -374,13 +408,46 @@ var editPolicy = function (pe, ps, access, request, res) {
                 // remove old policy set
                 ps.removePolicySet(policySet.$.id);
             }
+            var policySetObject = new pe.policyset(policySet);
+            var result = policySetObject.getPolicy([requestorId]);
+            if (result.matched.length > 0) {
+                policy = result.matched[0].toJSONObject();
+            }
+            else if (result.generic.length > 0) {
+                // start from default policy when adding a new device
+                policy = result.generic[0].toJSONObject();
+            }
+        }
+        // Start from default policy set when adding a new user
+        else if (policySet.generic.length > 0) {
+            policySet = policySet.generic[0].toJSONObject();
+            // make a copy of the policySet (clone object)
+            policySet = JSON.parse(JSON.stringify(policySet));
+            // modify policySet ids
+            policySet.$.id = 'ps_' + userId + '_' + date;
+            policySet.$.description = userId + '-policySet';
             for (var i = 0; i < policySet.policy.length; i++) {
+                // modify policy's and rules' ids
+                var id = 'Default';
                 if (policySet.policy[i].target) {
-                    if (policySet.policy[i].target[0].subject[0]['subject-match'][0].$.match === requestorId) {
-                        policy = policySet.policy[i];
-                        break;
-                    }
+                    var id = policySet.policy[i].target[0].subject[0]['subject-match'][0].$.match;
                 }
+                policySet.policy[i].$.id = 'p_' + userId + id + '_' + date;
+                policySet.policy[i].$.description = userId + id + '-policy';
+                for (var j = 0; j < policySet.policy[i].rule.length; j++) {
+                    policySet.policy[i].rule[j].$.id = 'r_' + userId + id + '_' + ++date;
+                }
+            }
+            policySet.target = [];
+            policySet.target.push({'subject': [{'subject-match': [{'$' : {'attr' : 'user-id', 'match' : userId}}]}]});
+            var policySetObject = new pe.policyset(policySet);
+            var result = policySetObject.getPolicy([requestorId]);
+            if (result.matched.length > 0) {
+                policy = result.matched[0].toJSONObject();
+            }
+            else if (result.generic.length > 0) {
+                // start from default policy when adding a new device
+                policy = result.generic[0].toJSONObject();
             }
         }
         // add new policySet
@@ -392,12 +459,29 @@ var editPolicy = function (pe, ps, access, request, res) {
             policySet.policy.push({'rule': [{'$' : {'effect' : 'deny', 'id' : 'r_' + userId + '_default'}}]});
         }
         if (policy != null) {
-            var requestorIds = policy.target[0].subject[0]['subject-match'][0].$.match.split(',');
-            // check if target contains a bag
-            if (requestorIds.length > 1) {
-                var index = requestorIds.indexOf(requestorId);
-                requestorIds.splice(index, 1);
-                policy.target[0].subject[0]['subject-match'][0].$.match = requestorIds.toString();
+            // this is not the default policy
+            if (policy.target) {
+                var requestorIds = policy.target[0].subject[0]['subject-match'][0].$.match.split(',');
+                // check if target contains a bag
+                if (requestorIds.length > 1) {
+                    var index = requestorIds.indexOf(requestorId);
+                    requestorIds.splice(index, 1);
+                    policy.target[0].subject[0]['subject-match'][0].$.match = requestorIds.toString();
+                    // make a copy of the policy (clone object)
+                    policy = JSON.parse(JSON.stringify(policy));
+                    // modify policy's and rules' ids
+                    policy.$.id = 'p_' + userId + requestorId + '_' + date;
+                    policy.$.description = userId + requestorId + '-policy';
+                    for (var i = 0; i < policy.rule.length; i++) {
+                        policy.rule[i].$.id = 'r_' + userId + requestorId + '_' + ++date;
+                    }
+                    // modify target to replace the generic URI
+                    policy.target[0].subject[0]['subject-match'][0].$.match = requestorId;
+                    policySet.policy.splice(0, 0, policy);
+                }
+            }
+            // this is the default policy
+            else {
                 // make a copy of the policy (clone object)
                 policy = JSON.parse(JSON.stringify(policy));
                 // modify policy's and rules' ids
@@ -406,8 +490,10 @@ var editPolicy = function (pe, ps, access, request, res) {
                 for (var i = 0; i < policy.rule.length; i++) {
                     policy.rule[i].$.id = 'r_' + userId + requestorId + '_' + ++date;
                 }
-                // modify target to replace the generic URI
-                policy.target[0].subject[0]['subject-match'][0].$.match = requestorId;
+                // add target
+                policy.target = [];
+                policy.target.push({'subject': [{'subject-match': [{'$' : {'attr' : 'requestor-id', 'match' : requestorId}}]}]});
+                policySet.policy.splice(0, 0, policy);
             }
             policy = removeOldResourceMatch(policy, serviceId, access);
         }
@@ -461,8 +547,32 @@ var editPolicy = function (pe, ps, access, request, res) {
 
             policy = removeOldResourceMatch(policy, serviceId, access);
         } else {
-            // new user, add policy
-            policy = createNewPolicy(ps, 'user-id', userId, userId, date);
+            if (policy.generic.length > 0) {
+                policy = policy.generic[0].toJSONObject();
+                var path = JSON.parse(res.user.path);
+                for (var i = 0; i < path.policy.length; i++) {
+                    if (path.policy[i].id === policy.$.id) {
+                        position = path.policy[i].position;
+                        break;
+                    }
+                }
+                // make a copy of the policy (clone object)
+                policy = JSON.parse(JSON.stringify(policy));
+                // modify policy's and rules' ids
+                policy.$.id = 'p_' + userId + '_' + date;
+                policy.$.description = userId + '-policy';
+                for (var i = 0; i < policy.rule.length; i++) {
+                    policy.rule[i].$.id = 'r_' + userId + '_' + ++date;
+                }
+                // add target
+                policy.target = [];
+                policy.target.push({'subject': [{'subject-match': [{'$' : {'attr' : 'user-id', 'match' : userId}}]}]});
+                policy = removeOldResourceMatch(policy, serviceId, access);
+            }
+            else {
+                // new user, add policy
+                policy = createNewPolicy(ps, 'user-id', userId, userId, date);
+            }
         }
 
         policy = addResource(policy, userId, serviceId, access, ++date);
@@ -479,7 +589,9 @@ var removeOldResourceMatch = function (policy, serviceId, access) {
     for (var i = 0; i < policy.rule.length; i++) {
         if ((policy.rule[i].$.effect == 'permit' && access == 'disable') ||
             (policy.rule[i].$.effect == 'deny' && access == 'enable')) {
-            if (policy.rule[i].condition) {
+            if (policy.rule[i].condition && (policy.rule[i].condition[0].$.combine == 'or' ||
+                (policy.rule[i].condition[0].$.combine == 'and' && policy.rule[i].condition[0]['resource-match'].length < 2))) {
+
                 for (var j = 0; j < policy.rule[i].condition[0]['resource-match'].length; j++) {
                     if (policy.rule[i].condition[0]['resource-match'][j].$.match == serviceId) {
                         policy.rule[i].condition[0]['resource-match'].splice(j,1);
@@ -517,13 +629,22 @@ var addResource = function (policy, Id, serviceId, access, date) {
     for (var i = 0; i < policy.rule.length; i++) {
         if (((policy.rule[i].$.effect == 'permit' && access == 'enable') ||
             (policy.rule[i].$.effect == 'deny' && access == 'disable')) &&
-            policy.rule[i].condition) {
+            policy.rule[i].condition && (policy.rule[i].condition[0].$.combine == 'or' ||
+            (policy.rule[i].condition[0].$.combine == 'and' && policy.rule[i].condition[0]['resource-match'].length == 1))) {
 
             var resourceMatch = {};
             resourceMatch.$ = {};
-            resourceMatch.$.attr = 'service-id';
+            if (isWebinosAPI(serviceId)) {
+                resourceMatch.$.attr = 'api-feature';
+            }
+            else {
+                resourceMatch.$.attr = 'service-id';
+            }
             resourceMatch.$.match= serviceId;
             policy.rule[i].condition[0]['resource-match'].push(resourceMatch);
+            if (policy.rule[i].condition[0].$.combine == 'and') {
+                policy.rule[i].condition[0].$.combine = 'or';
+            }
             addedResourceMatch = true;
         }
     }
@@ -544,13 +665,27 @@ var addResource = function (policy, Id, serviceId, access, date) {
         rule.condition[0]['resource-match'] = [];
         rule.condition[0]['resource-match'][0] = {};
         rule.condition[0]['resource-match'][0].$ = {};
-        rule.condition[0]['resource-match'][0].$.attr = 'service-id';
+        if (isWebinosAPI(serviceId)) {
+            rule.condition[0]['resource-match'][0].$.attr = 'api-feature';
+        }
+        else {
+            rule.condition[0]['resource-match'][0].$.attr = 'service-id';
+        }
         rule.condition[0]['resource-match'][0].$.match = serviceId;
         policy.rule.splice(0,0,rule);
     }
     return policy;
 }
 
+var isWebinosAPI = function(URI) {
+    var exp = new RegExp ('.+(?:api|ns|manager|mwc|core)\/(?:w3c\/|api-perms\/|internal\/|discovery\/)?[^\/\.]+','');
+    if (exp.exec(URI)) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 $(document).ready(function(){
     $("#b1").bind('click', function () {
@@ -559,6 +694,17 @@ $(document).ready(function(){
             user = webinos.session.getPZPId();
         }
         var service = "service1";
+        getPolicy_ServiceForPeople(user, service, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service by " + user);
+        });
+    });
+    $("#b1bis").bind('click', function () {
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
+        var service = "http://webinos.org/api/discovery";
         getPolicy_ServiceForPeople(user, service, function(access) {
             $('#status').html('STATUS: ');
             $('#status').append(access + " access to " + service + " service by " + user);
@@ -665,6 +811,24 @@ $(document).ready(function(){
             }
         });
     });
+    $("#b12bis").bind('click', function () {
+        var service = "http://webinos.org/api/discovery";
+        getPolicy_PeopleForServices(service, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b12ter").bind('click', function () {
+        var service = "http://webinos.org/core/policymanagement";
+        getPolicy_PeopleForServices(service, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service by " + users[i] + "<br />");
+            }
+        });
+    });
 
     $("#b13").bind('click', function () {
         var user = webinos.session.getPZHId();
@@ -720,6 +884,18 @@ $(document).ready(function(){
             $('#status').append("error " + msg + "<br />");
         });
     });
+    $("#b16bis").bind('click', function () {
+        var user = "friend2";
+        var service = "http://webinos.org/api/discovery";
+        var access = "enable"
+        setPolicy_ServiceForPeople(user, service, access, function() {
+            $('#status').html('STATUS ServiceForPeople5: ');
+            $('#status').append(access + " access to " + service + " service by " + user + "<br />");
+        }, function(msg) {
+            $('#status').html('STATUS: ');
+            $('#status').append("error " + msg + "<br />");
+        });
+    });
 
     $("#b17").bind('click', function () {
         var user = webinos.session.getPZHId();
@@ -766,13 +942,39 @@ $(document).ready(function(){
             $('#status').append("error " + msg + "<br />");
         });
     });
+    $("#b19bis").bind('click', function () {
+        var user = "friend3";
+        var service = "service3";
+        var access = "disable";
+        var device = "Car";
+        setPolicy_ServiceForPeople(user, service, device, access, function(users) {
+            $('#status').html('STATUS ServiceForPeople7bis: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user + "<br />");
+        }, function(msg) {
+            $('#status').html('STATUS: ');
+            $('#status').append("error " + msg + "<br />");
+        });
+    });
     $("#b20").bind('click', function () {
         var user = "friend4";
         var service = "service1";
-        var access = "disable";
+        var access = "enable";
         var device = "JetPlane";
         setPolicy_ServiceForPeople(user, service, device, access, function(users) {
             $('#status').html('STATUS ServiceForPeople8: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user + "<br />");
+        }, function(msg) {
+            $('#status').html('STATUS: ');
+            $('#status').append("error " + msg + "<br />");
+        });
+    });
+    $("#b20bis").bind('click', function () {
+        var user = "friend2";
+        var service = "http://webinos.org/api/discovery";
+        var access = "enable";
+        var device = "Phone";
+        setPolicy_ServiceForPeople(user, service, device, access, function(users) {
+            $('#status').html('STATUS ServiceForPeople9: ');
             $('#status').append(access + " access to " + service + " service from " + device + " by " + user + "<br />");
         }, function(msg) {
             $('#status').html('STATUS: ');
@@ -786,6 +988,18 @@ $(document).ready(function(){
             user = webinos.session.getPZPId();
         }
         var service = "service1";
+        var device = "Phone";
+        getPolicy_ServiceForPeople(user, service, device, function(access) {
+            $('#status').html('STATUS: ');
+            $('#status').append(access + " access to " + service + " service from " + device + " by " + user);
+        });
+    });
+    $("#b21bis").bind('click', function () {
+        var user = webinos.session.getPZHId();
+        if (!user) {
+            user = webinos.session.getPZPId();
+        }
+        var service = "http://webinos.org/api/discovery";
         var device = "Phone";
         getPolicy_ServiceForPeople(user, service, device, function(access) {
             $('#status').html('STATUS: ');
@@ -866,6 +1080,26 @@ $(document).ready(function(){
 
     $("#b29").bind('click', function () {
         var service = "service1";
+        var device = "Phone";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b29bis").bind('click', function () {
+        var service = "http://webinos.org/api/discovery";
+        var device = "Phone";
+        getPolicy_PeopleForServices(service, device, function(users) {
+            $('#status').html('STATUS: ');
+            for (var i = 0; i < users.length; i++) {
+                $('#status').append("enable access to " + service + " service from " + device + " by " + users[i] + "<br />");
+            }
+        });
+    });
+    $("#b29ter").bind('click', function () {
+        var service = "http://webinos.org/core/policymanagement";
         var device = "Phone";
         getPolicy_PeopleForServices(service, device, function(users) {
             $('#status').html('STATUS: ');
